@@ -57,41 +57,41 @@ class MakeMLP(nn.Module):
         return layers
     def init_weights(self,m):
         if type(m)==nn.Linear:
-            nn.init.xavier_uniform(m.weight)
+            nn.init.xavier_uniform_(m.weight)
             try:
-                nn.init.constant(m.bias, 0)
+                nn.init.constant_(m.bias, 0)
             except:
                 pass
 
     def init_weights_ngate(self,m):
         if type(m)==nn.Linear:
-            nn.init.normal(m.weight, std=0.005)
+            nn.init.normal_(m.weight, std=0.005)
 
             if self.args.ifbias_gate:
-                nn.init.constant(m.bias,0)
+                nn.init.constant_(m.bias,0)
     def init_weights_nei(self,m):
         if type(m)==nn.Linear:
 
-            nn.init.orthogonal(m.weight,gain=self.args.nei_std)
+            nn.init.orthogonal_(m.weight,gain=self.args.nei_std)
             if self.args.ifbias_nei:
-                nn.init.constant(m.bias,0)
+                nn.init.constant_(m.bias,0)
 
     def init_weights_attr(self,m):
         if type(m)==nn.Linear:
-            #nn.init.normal(m.weight,mean=0,std=self.args.WAq_std)
-            nn.init.xavier_uniform(m.weight)
+            #nn.init.normal_(m.weight,mean=0,std=self.args.WAq_std)
+            nn.init.xavier_uniform_(m.weight)
             try:
-                nn.init.constant(m.bias,0)
+                nn.init.constant_(m.bias,0)
             except:
                 pass
 
     def init_weights_rel(self,m):
         if type(m)==nn.Linear:
             nn.init.normal_(m.weight,mean=0,std=self.args.rela_std)
-            #nn.init.xavier_uniform(m.weight)
+            #nn.init.xavier_uniform_(m.weight)
             #m.weight.data+=0.1
             if self.args.ifbias_nei:
-                nn.init.constant(m.bias,0)
+                nn.init.constant_(m.bias,0)
 
 class LSTMCell(RNNCellBase):
     '''
@@ -120,13 +120,13 @@ class LSTMCell(RNNCellBase):
         gates = F.linear(input, self.weight_ih, self.bias_ih) + F.linear(hx, self.weight_hh, self.bias_hh)
         ingate, forgetgate, cellgate, outgate_ = gates.chunk(4, 1)
 
-        ingate = F.sigmoid(ingate)
-        forgetgate = F.sigmoid(forgetgate)
-        cellgate = F.tanh(cellgate)
-        outgate = F.sigmoid(outgate_ )
+        ingate = torch.sigmoid(ingate)
+        forgetgate = torch.sigmoid(forgetgate)
+        cellgate = torch.tanh(cellgate)
+        outgate = torch.sigmoid(outgate_ )
 
         cy = forgetgate * cx +ingate * cellgate
-        hy = outgate * F.tanh(cy)
+        hy = outgate * torch.tanh(cy)
 
         return outgate,hy, cy
 
@@ -185,7 +185,7 @@ class GCN(nn.Module):
 
         nei_index_t = nei_index.view((-1))
 
-        corr_t=corr_index.view((self.N * self.N, -1))
+        corr_t=corr_index.reshape((self.N * self.N, -1))
 
         if corr_t[nei_index_t > 0].shape[0] == 0:
             # Ignore when no neighbor in this batch
@@ -201,7 +201,7 @@ class GCN(nn.Module):
         nGate = self.ngate.MLP(tmp)
 
         # Attention
-        Pos_t = torch.full((self.N * self.N,1), 0, device=torch.device("cuda")).view(-1)
+        Pos_t = torch.full((self.N * self.N,1), 0, device=torch.device("cuda")).view(-1).type(torch.float32)
         tt = self.WAr.MLP(torch.cat((r_t, hi_t[nei_index_t > 0], nei_inputs[nei_index_t > 0]), 1)).view((-1))
         #have bug if there's any zero value in tt
 
@@ -212,7 +212,7 @@ class GCN(nn.Module):
         Pos_t = Pos.view(-1)
 
         # Message Passing
-        H = torch.full((self.N * self.N, self.D), 0, device=torch.device("cuda"))
+        H = torch.full((self.N * self.N, self.D), 0, device=torch.device("cuda")).type(torch.float32)
         H[nei_index_t > 0] = inputs_part * nGate
         H[nei_index_t > 0] = H[nei_index_t > 0] * Pos_t[nei_index_t > 0].repeat(self.D, 1).transpose(0, 1)
         H = H.view(self.N, self.N, -1)
@@ -220,7 +220,7 @@ class GCN(nn.Module):
 
         # Update Cell states
         C = H_sum + self_c
-        H = outgate * F.tanh(C)
+        H = outgate * torch.tanh(C)
 
         if self.args.ifdebug:
             value1 = torch.norm(H_sum[nei_num > 0]*self.args.nei_ratio ) / torch.norm(self_c[nei_num > 0])

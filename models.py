@@ -33,19 +33,19 @@ class SR_LSTM(nn.Module):
         self.init_parameters()
 
     def init_parameters(self):
-        nn.init.constant(self.inputLayer.bias, 0.0)
-        nn.init.normal(self.inputLayer.weight, std=self.args.std_in)
+        nn.init.constant_(self.inputLayer.bias, 0.0)
+        nn.init.normal_(self.inputLayer.weight, std=self.args.std_in)
 
-        nn.init.xavier_uniform(self.cell.weight_ih)
-        nn.init.orthogonal(self.cell.weight_hh, gain=0.001)
+        nn.init.xavier_uniform_(self.cell.weight_ih)
+        nn.init.orthogonal_(self.cell.weight_hh, gain=0.001)
 
-        nn.init.constant(self.cell.bias_ih, 0.0)
-        nn.init.constant(self.cell.bias_hh, 0.0)
+        nn.init.constant_(self.cell.bias_ih, 0.0)
+        nn.init.constant_(self.cell.bias_hh, 0.0)
         n = self.cell.bias_ih.size(0)
-        nn.init.constant(self.cell.bias_ih[n // 4:n // 2], 1.0)
+        nn.init.constant_(self.cell.bias_ih[n // 4:n // 2], 1.0)
 
-        nn.init.constant(self.outputLayer.bias, 0.0)
-        nn.init.normal(self.outputLayer.weight, std=self.args.std_out)
+        nn.init.constant_(self.outputLayer.bias, 0.0)
+        nn.init.normal_(self.outputLayer.weight, std=self.args.std_out)
 
     def forward(self, inputs,iftest=False):
 

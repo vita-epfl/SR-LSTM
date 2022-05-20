@@ -3,6 +3,7 @@ Train script
 Author: Pu Zhang
 Date: 2019/7/1
 '''
+from yaml import CLoader as Loader, CDumper as Dumper
 import argparse
 import ast
 from Processor import *
@@ -153,7 +154,7 @@ def get_parser():
     parser.add_argument(
         '--show_step',default=40,type=int)
     parser.add_argument(
-        '--start_test',default=100,type=int)
+        '--start_test',default=10,type=int)
     parser.add_argument(
         '--num_epochs',default=300,type=int)
     parser.add_argument(
@@ -176,7 +177,7 @@ def load_arg(p):
     # save arg
     if  os.path.exists(p.config):
         with open(p.config, 'r') as f:
-            default_arg = yaml.load(f)
+            default_arg = yaml.load(f, Loader=Loader)
         key = vars(p).keys()
         for k in default_arg.keys():
             if k not in key:

@@ -14,7 +14,11 @@ class Processor():
         Dataloader=DataLoader_bytrajec2
 
         self.dataloader = Dataloader(args)
+
+        if args.model == 'models.SRLSTM':
+            args.model = 'models.SR_LSTM'
         model=import_class(args.model)
+        
         self.net = model(args)
         self.set_optimizer()
         self.load_model()
@@ -27,7 +31,7 @@ class Processor():
             self.net=self.net.cuda()
         else:
             self.net=self.net.cpu()
-        print(self.net)
+        # print(self.net)
 
         self.net_file = open(os.path.join(self.args.model_dir, 'net.txt'), 'a+')
         self.net_file.write(str(self.net))
