@@ -7,12 +7,12 @@ from utils import *
 import time
 import torch.nn as nn
 import yaml
+
 class Processor():
     def __init__(self, args):
         self.args=args
 
         Dataloader=DataLoader_bytrajec2
-
         self.dataloader = Dataloader(args)
 
         if args.model == 'models.SRLSTM':
@@ -164,8 +164,6 @@ class Processor():
             return B,Bepoch
 
     def train_epoch(self,epoch):
-        self.dataloader.reset_batch_pointer(set='train', valid=False)
-
         loss_epoch=0
         v1_sum,v2_sum,v3_sum=0,0,0
 
@@ -210,9 +208,8 @@ class Processor():
         return train_loss_epoch,(v1_sum,v2_sum,v3_sum)
 
     def val_epoch(self, epoch):
-        if self.dataloader.val_fraction==0:
+        if self.dataloader.valbatchnums==0:
             return 0,0,0
-        self.dataloader.reset_batch_pointer(set='train', valid=True)
         error_epoch,final_error_epoch = 0,0
         error_cnt_epoch,final_error_cnt_epoch = 1e-5,1e-5
 
@@ -225,14 +222,19 @@ class Processor():
             inputs = tuple([i.cuda() for i in inputs])
 
             batch_abs, batch_norm, shift_value, seq_list, nei_list, nei_num, batch_pednum = inputs
-            inputs_fw = batch_abs[:-1], batch_norm[:-1], shift_value[:-1], seq_list[:-1], nei_list[:-1], nei_num[:-1], batch_pednum[:-1]
+            inputs_fw = \
+                batch_abs[:-1], batch_norm[:-1], shift_value[:-1], \
+                seq_list[:-1], nei_list[:-1], nei_num[:-1], batch_pednum[:-1]
             forward = self.net.forward
 
             outputs_infer, _, _, look = forward(inputs_fw, iftest=True)
             lossmask, num = getLossMask(outputs_infer, seq_list[0], seq_list[1:], using_cuda=self.args.using_cuda)
 
-            error, error_cnt, final_error, final_error_cnt, _ = L2forTest(outputs_infer, batch_norm[1:, :, :2],
-                                                                          self.args.obs_length, lossmask)
+            error, error_cnt, final_error, final_error_cnt, _ = \
+                L2forTest(
+                    outputs_infer, batch_norm[1:, :, :2], 
+                    self.args.obs_length, lossmask
+                    )
 
             v1, v2, v3=look
             v1_sum+=v1
@@ -254,7 +256,6 @@ class Processor():
         return val_error,final_error,0,0,(v1_sum,v2_sum,v3_sum)
 
     def test_epoch(self,epoch):
-        self.dataloader.reset_batch_pointer(set='test')
         error_epoch,final_error_epoch,error_nl_epoch = 0,0,0
         error_cnt_epoch,final_error_cnt_epoch,error_nl_cnt_epoch= 1e-5,1e-5,1e-5
 

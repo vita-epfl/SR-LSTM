@@ -40,7 +40,7 @@ class SR_LSTM(nn.Module):
         nn.init.orthogonal_(self.cell.weight_hh, gain=0.001)
 
         nn.init.constant_(self.cell.bias_ih, 0.0)
-        nn.init.constant_(self.cell.bias_hh, 0.0)
+        nn.init.constant_(self.cell.bias_hh, 0.0) 
         n = self.cell.bias_ih.size(0)
         nn.init.constant_(self.cell.bias_ih[n // 4:n // 2], 1.0)
 
@@ -111,7 +111,12 @@ class SR_LSTM(nn.Module):
             hidden_states[node_index]=hidden_states_current
             cell_states[node_index] = cell_states_current
 
-        return outputs, hidden_states, cell_states,(value1_sum/self.args.seq_length,value2_sum/self.args.seq_length,value3_sum/self.args.seq_length)
+        return outputs, hidden_states, cell_states, \
+            (
+                value1_sum/self.args.seq_length, \
+                value2_sum/self.args.seq_length, \
+                value3_sum/self.args.seq_length
+            )
 
 
 
