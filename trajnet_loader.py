@@ -138,6 +138,9 @@ def trajnet_loader(
     ):
     obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel = [], [], [], []
     loss_mask, seq_start_end = [], []
+    # Required for SR-LSTM
+    pos_scenes, peds_are_present = [], [] 
+
     non_linear_ped = torch.Tensor([]) # dummy
     num_batches = 0
     for batch_idx, (filename, scene_id, paths) in enumerate(data_loader):
@@ -168,12 +171,21 @@ def trajnet_loader(
             pred_traj_gt.append(torch.Tensor(pos_scene[-args.pred_len:]))
             obs_traj_rel.append(torch.Tensor(vel_scene[:args.obs_len]))
             pred_traj_gt_rel.append(torch.Tensor(vel_scene[-args.pred_len:]))
-
             # Get Seq Delimiter and Dummy Loss Mask
             seq_start_end.append(pos_scene.shape[1])
             curr_mask = torch.ones((pos_scene.shape[0], pos_scene.shape[1]))
             loss_mask.append(curr_mask)
             num_batches += 1
+
+            # === Required for SR-LSTM ===
+            pos_scene_obs_pred = pos_scene[:args.obs_len + args.pred_len]
+            pos_scene_obs_pred = torch.Tensor(pos_scene_obs_pred)
+
+            pos_scenes.append(torch.Tensor(pos_scene_obs_pred))
+            peds_are_present.append(
+                torch.isfinite(pos_scene_obs_pred).all(axis=2)
+                )
+            # ============================
 
         if num_batches % args.batch_size != 0 and (batch_idx + 1) != len(data_loader):
             continue
@@ -187,7 +199,18 @@ def trajnet_loader(
             seq_start_end = [0] + seq_start_end
             seq_start_end = torch.LongTensor(np.array(seq_start_end).cumsum())
             seq_start_end = torch.stack((seq_start_end[:-1], seq_start_end[1:]), dim=1)
-            yield (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
-                non_linear_ped, loss_mask, seq_start_end)
+
+            # === Required for SR-LSTM ===
+            pos_scenes = torch.cat(pos_scenes, dim=1).cuda()
+            peds_are_present = torch.cat(peds_are_present, dim=1).cuda()
+            # ============================
+
+            yield (
+                obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
+                non_linear_ped, loss_mask, seq_start_end, 
+                pos_scenes, peds_are_present
+                )
+
             obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel = [], [], [], []
             loss_mask, seq_start_end = [], []
+            pos_scenes, peds_are_present = [], []
