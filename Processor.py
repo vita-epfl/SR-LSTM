@@ -138,12 +138,16 @@ class Processor():
         for epoch in range(self.args.num_epochs):
 
             train_loss,_=self.train_epoch(epoch)
-            val_error,val_final,_,_,_= self.val_epoch(epoch)
+            ################################
+            # Using the test function instead of validation after each epoch
+            val_error,val_final,_,_,_= self.test_epoch(epoch)
+            # val_error,val_final,_,_,_= self.val_epoch(epoch)
 
             #test
             if epoch > self.args.start_test:
-                test_error, test_final_error,_,look,_ = self.test_epoch(epoch)
+                # test_error, test_final_error,_,look,_ = self.test_epoch(epoch)
                 self.save_model(epoch)
+            ################################
 
             #log files
             self.log_file_curve.write(str(epoch) + ',' + str(train_loss) + ',' + str(
@@ -281,9 +285,17 @@ class Processor():
             value2_sum += value2
             value3_sum += value3
 
-            lossmask, num = getLossMask(outputs_infer, seq_list[0], seq_list[1:], using_cuda=self.args.using_cuda)
-            error, error_cnt, final_error, final_error_cnt, error_nl,error_nl_cnt,_ = L2forTest_nl(outputs_infer, batch_norm[1:, :, :2],
-                                                                              self.args.obs_length, lossmask,seq_list[1:],nl_thred=0)
+            lossmask, num = getLossMask(
+                outputs_infer, seq_list[0], seq_list[1:], 
+                using_cuda=self.args.using_cuda
+                )
+            
+            error, error_cnt, final_error, final_error_cnt, \
+            error_nl, error_nl_cnt, _ \
+                = L2forTest_nl(
+                    outputs_infer, batch_norm[1:, :, :2], 
+                    self.args.obs_length, lossmask,seq_list[1:], nl_thred=0
+                    )
 
             error_epoch += error
             error_cnt_epoch += error_cnt

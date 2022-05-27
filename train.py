@@ -172,7 +172,22 @@ def get_parser():
         '--learning_rate',default=0.0015,type=float)
     parser.add_argument(
         '--clip',default=1,type=int)
+
+    # === Trajnet++ ===
+    parser.add_argument("--dataset_name", default="colfree_trajdata", type=str)
+    parser.add_argument("--delim", default="\t")
+    parser.add_argument("--loader_num_workers", default=4, type=int)
+    parser.add_argument("--obs_len", default=8, type=int)
+    parser.add_argument("--pred_len", default=12, type=int)
+    parser.add_argument("--skip", default=1, type=int)
+    parser.add_argument("--fill_missing_obs", default=0, type=int)
+    parser.add_argument("--keep_single_ped_scenes", default=0, type=int)
+    parser.add_argument("--sample", type=float, default=1.0)
+    # =================
+
     return parser
+
+
 def load_arg(p):
     # save arg
     if  os.path.exists(p.config):
@@ -209,7 +224,18 @@ if __name__ == '__main__':
     args = load_arg(p)
     torch.cuda.set_device(args.gpu)
     processor = Processor(args)
-    if args.phase=='test':
-        processor.playtest()
-    else:
-        processor.playtrain()
+    
+    ###########################
+    # TODO:
+    # !!! Take care of the trajnet_loader for testing !!!
+    # L177: pos_scene_obs_pred = pos_scene[:args.obs_len + args.pred_len]
+
+    # if args.phase=='test':
+    #     processor.playtest()
+    # else:
+    #     processor.playtrain()
+    ###########################
+
+    # Delete this when TODO is resolved
+    processor.playtrain()
+    

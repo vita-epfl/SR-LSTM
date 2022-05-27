@@ -149,8 +149,6 @@ def trajnet_loader(
             [num_frames, num_peds]
         - batch_pednum: num_peds_per_batch
             [batch_size]
-      .................... FINISH .....................
-
     """
     # Specific for SR-LSTM
     num_frames = args.obs_len + args.pred_len
@@ -202,8 +200,8 @@ def trajnet_loader(
             continue
         
         if len(pos_scenes):
-            pos_scenes = torch.cat(pos_scenes, dim=1).cuda()
-            peds_are_present = torch.cat(peds_are_present, dim=1).cuda()
+            pos_scenes = torch.cat(pos_scenes, dim=1)
+            peds_are_present = torch.cat(peds_are_present, dim=1)
 
             # Create block-diagonal adjacency matrices
             #   - currently they are [20, p1, p1], [20, p2, p2], ...
@@ -237,11 +235,17 @@ def trajnet_loader(
             #   [3, 3, 6, ...]; shape = [batch_size]
             num_peds_per_batch = seq_start_end[:, 1] - seq_start_end[:, 0] + 1
 
-            yield (
-                pos_scenes, peds_are_present, 
-                adj_matrices_block_diag, num_neighbors_per_frame, 
-                num_peds_per_batch
+            batch_to_yield = (
+                pos_scenes.numpy(), 
+                peds_are_present.numpy(), 
+                adj_matrices_block_diag.numpy(), 
+                num_neighbors_per_frame.numpy(), 
+                num_peds_per_batch.numpy()
                 )
+
+            # SR-LSTM also requires a 'batch_id' as a return value, 
+            # but since it seems unimportant, we pass an empty string
+            yield batch_to_yield, ''
 
             pos_scenes, peds_are_present = [], []
             adj_matrices, seq_start_end = [], []
