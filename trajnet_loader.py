@@ -136,13 +136,26 @@ def trajnet_loader(
     keep_single_ped_scenes=False,
     fill_missing_obs=False
     ):
-    obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel = [], [], [], []
-    loss_mask, seq_start_end = [], []
-    # Required for SR-LSTM
-    num_frames = args.obs_len + args.pred_len
-    pos_scenes, peds_are_present, adj_matrices = [], [], []
+    """
+    The SR-LSTM expects the return values to have the following format:
+    Denoted as: {their_variable_name}: {our_variable_name} \n {shape}
+        - batch: pos_scenes
+            [num_frames, num_peds_batch, 2]
+        - seq_list: peds_are_present
+            [num_frames, num_peds_batch]
+        - nei_list: adj_matrices_block_diag
+            [num_frames, num_peds_batch, num_peds_batch]
+        - nei_num: num_neighbors_per_frame
+            [num_frames, num_peds]
+        - batch_pednum: num_peds_per_batch
+            [batch_size]
+      .................... FINISH .....................
 
-    non_linear_ped = torch.Tensor([]) # dummy
+    """
+    # Specific for SR-LSTM
+    num_frames = args.obs_len + args.pred_len
+    pos_scenes, peds_are_present, adj_matrices, seq_start_end = [], [], [], []
+
     num_batches = 0
     for batch_idx, (filename, scene_id, paths) in enumerate(data_loader):
         if test:
@@ -161,24 +174,8 @@ def trajnet_loader(
             full_traj = np.isfinite(pos_scene).all(axis=2).all(axis=0)
             pos_scene = pos_scene[:, full_traj]
         
-        # Make Rel Scene
-        vel_scene = np.zeros_like(pos_scene)
-        vel_scene[1:] = pos_scene[1:] - pos_scene[:-1]
-
-        # STGAT Model needs atleast 2 pedestrians per scene.
+        # === From now on it's specific for SR-LSTM ===
         if sum(full_traj) > 1 or keep_single_ped_scenes:
-            # Get Obs, Preds attributes
-            obs_traj.append(torch.Tensor(pos_scene[:args.obs_len]))
-            pred_traj_gt.append(torch.Tensor(pos_scene[-args.pred_len:]))
-            obs_traj_rel.append(torch.Tensor(vel_scene[:args.obs_len]))
-            pred_traj_gt_rel.append(torch.Tensor(vel_scene[-args.pred_len:]))
-            # Get Seq Delimiter and Dummy Loss Mask
-            seq_start_end.append(pos_scene.shape[1])
-            curr_mask = torch.ones((pos_scene.shape[0], pos_scene.shape[1]))
-            loss_mask.append(curr_mask)
-            num_batches += 1
-
-            # === Required for SR-LSTM ===
             pos_scene_obs_pred = pos_scene[:args.obs_len + args.pred_len]
             pos_scene_obs_pred = torch.Tensor(pos_scene_obs_pred)
 
@@ -193,25 +190,18 @@ def trajnet_loader(
                 peds_are_in_frame = peds_are_in_scene[t, :].reshape(-1, 1)
                 adj_matrix_frame = peds_are_in_frame @ peds_are_in_frame.T
                 adj_matrices_scene.append(adj_matrix_frame)
-            
             adj_matrices_scene = torch.stack(adj_matrices_scene)
             adj_matrices.append(adj_matrices_scene)
-            # ============================
+
+            # Get Seq Delimiter 
+            seq_start_end.append(pos_scene.shape[1])
+
+            num_batches += 1
 
         if num_batches % args.batch_size != 0 and (batch_idx + 1) != len(data_loader):
             continue
         
-        if len(obs_traj):
-            obs_traj = torch.cat(obs_traj, dim=1).cuda()
-            pred_traj_gt = torch.cat(pred_traj_gt, dim=1).cuda()
-            obs_traj_rel = torch.cat(obs_traj_rel, dim=1).cuda()
-            pred_traj_gt_rel = torch.cat(pred_traj_gt_rel, dim=1).cuda()
-            loss_mask = torch.cat(loss_mask, dim=1).cuda().permute(1, 0)
-            seq_start_end = [0] + seq_start_end
-            seq_start_end = torch.LongTensor(np.array(seq_start_end).cumsum())
-            seq_start_end = torch.stack((seq_start_end[:-1], seq_start_end[1:]), dim=1)
-
-            # === Required for SR-LSTM ===
+        if len(pos_scenes):
             pos_scenes = torch.cat(pos_scenes, dim=1).cuda()
             peds_are_present = torch.cat(peds_are_present, dim=1).cuda()
 
@@ -232,15 +222,27 @@ def trajnet_loader(
 
             # Stack them up all together => [20, p1+p2+..., p1+p2+...]
             adj_matrices_block_diag = torch.stack(adj_matrices_block_diag_per_frame)
-            # ============================
+
+            # Count the neighbors of each pedestrian in each frame
+            num_neighbors_per_frame = torch.sum(adj_matrices_block_diag, axis=2)
+
+            # Compute start-end sequences for pedestrians in the batch
+            seq_start_end = [0] + seq_start_end
+            seq_start_end = torch.LongTensor(np.array(seq_start_end).cumsum())
+            seq_start_end = torch.stack((seq_start_end[:-1], seq_start_end[1:]), dim=1)
+
+            # This tensor is of the following format:
+            #   [[0 2], [3 5], [6 11], ...]; shape = [batch_size, 2]
+            # and in SR-LSTM it's expected to be:
+            #   [3, 3, 6, ...]; shape = [batch_size]
+            num_peds_per_batch = seq_start_end[:, 1] - seq_start_end[:, 0] + 1
 
             yield (
-                obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
-                non_linear_ped, loss_mask, seq_start_end, 
-                pos_scenes, peds_are_present, adj_matrices_block_diag
+                pos_scenes, peds_are_present, 
+                adj_matrices_block_diag, num_neighbors_per_frame, 
+                num_peds_per_batch
                 )
 
-            obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel = [], [], [], []
-            loss_mask, seq_start_end = [], []
             pos_scenes, peds_are_present = [], []
-            adj_matrices = []
+            adj_matrices, seq_start_end = [], []
+        # =============================================
