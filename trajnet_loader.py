@@ -139,7 +139,8 @@ def trajnet_loader(
     obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel = [], [], [], []
     loss_mask, seq_start_end = [], []
     # Required for SR-LSTM
-    pos_scenes, peds_are_present = [], [] 
+    num_frames = args.obs_len + args.pred_len
+    pos_scenes, peds_are_present, adj_matrices = [], [], []
 
     non_linear_ped = torch.Tensor([]) # dummy
     num_batches = 0
@@ -182,9 +183,19 @@ def trajnet_loader(
             pos_scene_obs_pred = torch.Tensor(pos_scene_obs_pred)
 
             pos_scenes.append(torch.Tensor(pos_scene_obs_pred))
-            peds_are_present.append(
-                torch.isfinite(pos_scene_obs_pred).all(axis=2)
-                )
+            peds_are_in_scene = \
+                torch.isfinite(pos_scene_obs_pred).all(axis=2).type(torch.int8)
+            peds_are_present.append(peds_are_in_scene)
+            
+            # Compute the adjacency matrices for the current scene
+            adj_matrices_scene = []
+            for t in range(num_frames):
+                peds_are_in_frame = peds_are_in_scene[t, :].reshape(-1, 1)
+                adj_matrix_frame = peds_are_in_frame @ peds_are_in_frame.T
+                adj_matrices_scene.append(adj_matrix_frame)
+            
+            adj_matrices_scene = torch.stack(adj_matrices_scene)
+            adj_matrices.append(adj_matrices_scene)
             # ============================
 
         if num_batches % args.batch_size != 0 and (batch_idx + 1) != len(data_loader):
@@ -203,14 +214,33 @@ def trajnet_loader(
             # === Required for SR-LSTM ===
             pos_scenes = torch.cat(pos_scenes, dim=1).cuda()
             peds_are_present = torch.cat(peds_are_present, dim=1).cuda()
+
+            # Create block-diagonal adjacency matrices
+            #   - currently they are [20, p1, p1], [20, p2, p2], ...
+            #   - should be [20, p1+p2+..., p1+p2+...]
+            adj_matrices_block_diag_per_frame = []
+            for t in range(num_frames):
+                adj_matrices_frame_t = []
+                for adj_matrix_scene in adj_matrices:
+                    adj_matrices_frame_t.append(adj_matrix_scene[t, ...])
+
+                # Appending a matrix of shape [p1+p2+..., p1+p2+...]
+                # that corresponds to the t-th frame
+                adj_matrices_block_diag_per_frame.append(
+                    torch.block_diag(*adj_matrices_frame_t)
+                    )
+
+            # Stack them up all together => [20, p1+p2+..., p1+p2+...]
+            adj_matrices_block_diag = torch.stack(adj_matrices_block_diag_per_frame)
             # ============================
 
             yield (
                 obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
                 non_linear_ped, loss_mask, seq_start_end, 
-                pos_scenes, peds_are_present
+                pos_scenes, peds_are_present, adj_matrices_block_diag
                 )
 
             obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel = [], [], [], []
             loss_mask, seq_start_end = [], []
             pos_scenes, peds_are_present = [], []
+            adj_matrices = []
