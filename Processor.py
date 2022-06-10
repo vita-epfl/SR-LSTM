@@ -92,13 +92,16 @@ class Processor():
             self.parameters_update_seton_secondSR()
 
     def save_model(self,epoch):
-        model_path= self.args.save_dir + '/' + self.args.train_model + '/' + self.args.train_model + '_' +\
-                                   str(epoch) + '.tar'
-        torch.save({
-            'epoch': epoch,
-            'state_dict': self.net.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict()
-        }, model_path)
+        model_path = self.args.save_dir + '/' + self.args.train_model + '/' + \
+            self.args.train_model + '_latest' + '.tar'
+        torch.save(
+            {
+                'epoch': epoch,
+                'state_dict': self.net.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict()
+            }, 
+            model_path
+            )
 
     def load_model(self):
         if self.args.load_model > 0:
@@ -178,8 +181,12 @@ class Processor():
             inputs = tuple([i.cuda() for i in inputs])
 
             loss=torch.zeros(1).cuda()
-            batch_abs, batch_norm, shift_value, seq_list, nei_list, nei_num, batch_pednum = inputs
-            inputs_fw = batch_abs[:-1], batch_norm[:-1], shift_value[:-1], seq_list[:-1], nei_list[:-1], nei_num[:-1], batch_pednum[:-1]
+            batch_abs, batch_norm, shift_value, \
+            seq_list, nei_list, nei_num, batch_pednum = \
+                inputs
+            inputs_fw = \
+                batch_abs[:-1], batch_norm[:-1], shift_value[:-1], \
+                seq_list[:-1], nei_list[:-1], nei_num[:-1], batch_pednum[:-1]
 
             self.net.zero_grad()
 
@@ -274,8 +281,13 @@ class Processor():
             if self.args.using_cuda:
                 inputs = tuple([i.cuda() for i in inputs])
 
-            batch_abs, batch_norm, shift_value, seq_list, nei_list, nei_num, batch_pednum = inputs
-            inputs_fw = batch_abs[:-1], batch_norm[:-1], shift_value[:-1], seq_list[:-1], nei_list[:-1], nei_num[:-1], batch_pednum[:-1]
+            batch_abs, batch_norm, shift_value, \
+            seq_list, nei_list, nei_num, batch_pednum = \
+                inputs
+            inputs_fw = \
+                batch_abs[:-1], batch_norm[:-1], shift_value[:-1], \
+                seq_list[:-1], nei_list[:-1], nei_num[:-1], batch_pednum[:-1]
+
             forward = self.net.forward
             self.net.zero_grad()
             outputs_infer, _, _, look = forward(inputs_fw, iftest=True)
