@@ -2,6 +2,7 @@
 Author: Pu Zhang
 Date: 2019/7/1
 '''
+from cgi import test
 from utils import *
 
 import time
@@ -91,17 +92,22 @@ class Processor():
 
             self.parameters_update_seton_secondSR()
 
-    def save_model(self,epoch):
+    def save_model(self, epoch, suffix=None, test_error=None):
+        if suffix is None:
+            suffix = '_' + str(epoch)
         model_path = self.args.save_dir + '/' + self.args.train_model + '/' + \
-            self.args.train_model + '_latest' + '.tar'
-        torch.save(
-            {
-                'epoch': epoch,
-                'state_dict': self.net.state_dict(),
-                'optimizer_state_dict': self.optimizer.state_dict()
-            }, 
-            model_path
-            )
+            self.args.train_model + suffix + '.tar'
+        
+        dict_to_save = {
+            'epoch': epoch,
+            'state_dict': self.net.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict()
+            }
+        
+        if test_error is not None:
+            dict_to_save['test_error'] = test_error
+
+        torch.save(dict_to_save, model_path)
 
     def load_model(self):
         if self.args.load_model > 0:
@@ -137,7 +143,7 @@ class Processor():
     def playtrain(self):
         print('Training begin')
         find_result=[]
-        test_error, test_final_error=0,0
+        test_error, test_final_error, best_test_error = 0, 0, 0
         for epoch in range(self.args.num_epochs):
             
             # Train and validation epochs
@@ -147,7 +153,11 @@ class Processor():
             # Test and save the model
             if epoch > self.args.start_test:
                 test_error, test_final_error,_,look,_ = self.test_epoch(epoch)
-                self.save_model(epoch)
+                suffix = '_latest'
+                if test_error < best_test_error:
+                    suffix = '_best'
+                    best_test_error = test_error
+                self.save_model(epoch, suffix, test_error)
 
             # Log files
             self.log_file_curve.write(str(epoch) + ',' + str(train_loss) + ',' + str(
@@ -158,7 +168,7 @@ class Processor():
                 self.log_file_curve = open(os.path.join(self.args.model_dir, 'log_curve.txt'), 'a+')
 
             # Console log
-            print('----epoch {}, train_loss={:.5f}, valid_error={:.3f}, valid_final={:.3f},test_error={:.3f},valid_final={:.3f}'
+            print('----epoch {}, train_loss={:.5f}, valid_error={:.3f}, valid_final={:.3f},test_error={:.3f},test_final={:.3f}'
                   .format(epoch, train_loss,val_error, val_final,test_error,test_final_error))
 
     def smaller(self,A,Aepoch,B,Bepoch):
