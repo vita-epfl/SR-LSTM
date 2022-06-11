@@ -232,9 +232,9 @@ if __name__ == '__main__':
     p.dataset = p.dataset_name
     # =================
 
-    p.save_dir=p.save_base_dir+str(p.test_set)+'/'
-    p.model_dir=p.save_base_dir+str(p.test_set)+'/'+p.train_model+'/'
-    p.config=p.model_dir+'/config_'+p.phase+'.yaml'
+    p.save_dir = p.save_base_dir + str(p.test_set) + '/'
+    p.model_dir = p.save_base_dir + str(p.test_set) + '/' + p.train_model + '/'
+    p.config= p.model_dir + '/config_' + p.phase + '.yaml'
 
     if not load_arg(p):
         save_arg(p)
@@ -242,18 +242,7 @@ if __name__ == '__main__':
     torch.cuda.set_device(args.gpu)
     processor = Processor(args)
     
-    ###########################
-    # TODO:
-    # !!! Take care of the trajnet_loader for testing !!!
-    # L177: pos_scene_obs_pred = pos_scene[:args.obs_len + args.pred_len]
-
-    # if args.phase=='test':
-    #     processor.playtest()
-    # else:
-    #     processor.playtrain()
-    ###########################
-
-    # Delete this when TODO is resolved
+    # Run training
     processor.playtrain()
     
 

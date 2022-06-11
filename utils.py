@@ -34,24 +34,9 @@ class DataLoader_bytrajec2():
             self.load_trajnet_loader(self.args, 'val')
         print('Total number of validation batches:', self.valbatchnums)
 
-        ###########################
-        # TODO:
-        # !!! Take care of the trajnet_loader for testing !!!
-        # L177: pos_scene_obs_pred = pos_scene[:args.obs_len + args.pred_len]
-        
-        # !!! Uncomment it in the train script as well !!!
-
-        # self.testbatch, self.testbatchnums = \
-        #     self.load_trajnet_loader(self.args, 'test')
-        # print('Total number of test batches:', self.testbatchnums)
-
-        # Using the validation set as the test loader since the test_epoch 
-        # function computes ADE/FDE as well
         self.testbatch, self.testbatchnums = \
-            self.load_trajnet_loader(self.args, 'val')
+            self.load_trajnet_loader(self.args, 'test_private')
         print('Total number of test batches:', self.testbatchnums)
-        ###########################
-        
         # =======================================
 
 

@@ -139,28 +139,25 @@ class Processor():
         find_result=[]
         test_error, test_final_error=0,0
         for epoch in range(self.args.num_epochs):
-
-            train_loss,_=self.train_epoch(epoch)
-            ################################
-            # Using the test function instead of validation after each epoch
-            val_error,val_final,_,_,_= self.test_epoch(epoch)
-            # val_error,val_final,_,_,_= self.val_epoch(epoch)
-
-            #test
+            
+            # Train and validation epochs
+            train_loss,_ = self.train_epoch(epoch)
+            val_error,val_final,_,_,_ = self.val_epoch(epoch)
+            
+            # Test and save the model
             if epoch > self.args.start_test:
-                # test_error, test_final_error,_,look,_ = self.test_epoch(epoch)
+                test_error, test_final_error,_,look,_ = self.test_epoch(epoch)
                 self.save_model(epoch)
-            ################################
 
-            #log files
+            # Log files
             self.log_file_curve.write(str(epoch) + ',' + str(train_loss) + ',' + str(
                 val_error) + ',' + str(val_final) + ','+str(test_error) + ',' + str(test_final_error) + '\n')
 
-            if epoch%10==0:
+            if epoch % 10 == 0:
                 self.log_file_curve.close()
                 self.log_file_curve = open(os.path.join(self.args.model_dir, 'log_curve.txt'), 'a+')
 
-            #console log
+            # Console log
             print('----epoch {}, train_loss={:.5f}, valid_error={:.3f}, valid_final={:.3f},test_error={:.3f},valid_final={:.3f}'
                   .format(epoch, train_loss,val_error, val_final,test_error,test_final_error))
 
@@ -190,7 +187,7 @@ class Processor():
 
             self.net.zero_grad()
 
-            outputs, _, _ ,look= self.net.forward(inputs_fw,iftest=False)
+            outputs, _, _ , look = self.net.forward(inputs_fw,iftest=False)
 
             v1, v2, v3=look
             v1_sum+=v1
