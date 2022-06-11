@@ -111,8 +111,10 @@ class Processor():
 
     def load_model(self):
         if self.args.load_model > 0:
-            self.args.model_save_path = self.args.save_dir + '/' + self.args.train_model + '/' + self.args.train_model + '_' + \
-                                        str(self.args.load_model) + '.tar'
+            self.args.model_save_path = \
+                self.args.save_dir + '/' + self.args.train_model + '/' + \
+                self.args.train_model + '_best' + '.tar'
+                # self.args.train_model + '_' + str(self.args.load_model) + '.tar'
             if os.path.isfile(self.args.model_save_path):
                 print('Loading checkpoint')
                 checkpoint = torch.load(self.args.model_save_path,map_location={'cuda:0': 'cuda:'+str(self.args.gpu)})
@@ -121,9 +123,12 @@ class Processor():
                 print('Loaded checkpoint at epoch', model_epoch)
 
     def load_model_epoch(self,epoch):
+        raise NotImplementedError
         if epoch > 0:
-            self.args.model_save_path = self.args.save_dir + '/' + self.args.train_model + '/' + self.args.train_model + '_' +\
-                                   str(epoch) + '.tar'
+            self.args.model_save_path = \
+                self.args.save_dir + '/' + self.args.train_model + '/' + \
+                self.args.train_model + '_' + str(epoch) + '.tar'
+
             if os.path.isfile(self.args.model_save_path):
                 print('Loading checkpoint')
                 checkpoint = torch.load(self.args.model_save_path)#,map_location={'cuda:2': 'cuda:0'})
@@ -273,7 +278,7 @@ class Processor():
 
         return val_error,final_error,0,0,(v1_sum,v2_sum,v3_sum)
 
-    def test_epoch(self,epoch):
+    def test_epoch(self, epoch):
         error_epoch,final_error_epoch,error_nl_epoch = 0,0,0
         error_cnt_epoch,final_error_cnt_epoch,error_nl_cnt_epoch= 1e-5,1e-5,1e-5
 
