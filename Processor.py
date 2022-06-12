@@ -13,8 +13,13 @@ class Processor():
     def __init__(self, args):
         self.args=args
 
-        Dataloader=DataLoader_bytrajec2
-        self.dataloader = Dataloader(args)
+        # If we're in trajnet_evaluator mode, then the dataloader has to be
+        # created additionally (passing the prepared trajnet loader)
+        if self.args.trajnet_evaluator:
+            self.dataloader = None
+        else:
+            Dataloader=DataLoader_bytrajec2
+            self.dataloader = Dataloader(args)
 
         if args.model == 'models.SRLSTM':
             args.model = 'models.SR_LSTM'
@@ -38,6 +43,13 @@ class Processor():
         self.net_file.write(str(self.net))
         self.net_file.close()
         self.log_file_curve = open(os.path.join(self.args.model_dir, 'log_curve.txt'), 'a+')
+
+
+    def create_dataloader_for_evaluator(self, prepared_data, zero_pad=True):
+        Dataloader=DataLoader_bytrajec2
+        self.dataloader = Dataloader(self.args, prepared_data, zero_pad=zero_pad)
+    
+
     def parameters_update_seton(self):
         for p in self.net.parameters():
             p.requires_grad=True

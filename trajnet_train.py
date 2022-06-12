@@ -176,6 +176,7 @@ def get_parser():
         '--clip',default=1,type=int)
 
     # === Trajnet++ ===
+    parser.add_argument("--trajnet_evaluator", default=0, type=int)
     parser.add_argument("--log_dir", default="./")
     parser.add_argument("--dataset_name", default="colfree_trajdata", type=str)
     parser.add_argument("--delim", default="\t")

@@ -1,6 +1,7 @@
 import os
 import argparse
 import pickle
+from platform import processor
 
 from joblib import Parallel, delayed
 import scipy
@@ -61,35 +62,8 @@ def predict_scene(model, batch, args):
 
 
 def load_predictor(args):
-    checkpoint = torch.load(args.checkpoint)
-    
-    n_units = (
-        [args.traj_lstm_hidden_size]
-        + [int(x) for x in args.hidden_units.strip().split(",")]
-        + [args.graph_lstm_hidden_size]
-        )
-    n_heads = [int(x) for x in args.heads.strip().split(",")]
-
-    model = TrajectoryGenerator(
-        obs_len=args.obs_len,
-        pred_len=args.pred_len,
-        traj_lstm_input_size=args.traj_lstm_input_size,
-        traj_lstm_hidden_size=args.traj_lstm_hidden_size,
-        n_units=n_units,
-        n_heads=n_heads,
-        graph_network_out_dims=args.graph_network_out_dims,
-        dropout=args.dropout,
-        alpha=args.alpha,
-        graph_lstm_hidden_size=args.graph_lstm_hidden_size,
-        noise_dim=args.noise_dim,
-        noise_type=args.noise_type,
-        )
-
-    model.load_state_dict(checkpoint["state_dict"])
-    model.cuda()
-    model.eval()
-
-    return model
+    processor = Processor(args)
+    return processor
 
 
 def get_predictions(args):
@@ -123,7 +97,7 @@ def get_predictions(args):
             continue
 
         print("Model Name: ", model_name)
-        model = load_predictor(args)
+        processor = load_predictor(args)
         goal_flag = False
 
         # Iterate over test datasets
@@ -133,33 +107,28 @@ def get_predictions(args):
                 load_test_datasets(dataset, goal_flag, args)
 
             # Convert it to a trajnet loader
-            scenes_loader = trajnet_loader(
-                scenes, 
-                args, 
-                drop_distant_ped=False, 
-                test=True,
-                keep_single_ped_scenes=args.keep_single_ped_scenes,
-                fill_missing_obs=args.fill_missing_obs
-                ) 
-
-            # Can be removed; it was useful for debugging
-            scenes_loader = list(scenes_loader)
+            processor.create_dataloader_for_evaluator(scenes, zero_pad=True)
 
             # Get all predictions in parallel. Faster!
-            scenes_loader = tqdm(scenes_loader)
-            pred_list = Parallel(n_jobs=args.n_jobs)(
-                delayed(predict_scene)(model, batch, args)
-                for batch in scenes_loader
-                )
+            scenes_loader = tqdm(processor.dataloader.testbatch)
             
-            # Write all predictions
-            write_predictions(pred_list, scenes, model_name, dataset_name, args)
+            ###############
+            # TODO:
+            # pred_list = Parallel(n_jobs=args.n_jobs)(
+            #     delayed(predict_scene)(model, batch, args)
+            #     for batch in scenes_loader
+            #     )
+            
+            # # Write all predictions
+            # write_predictions(pred_list, scenes, model_name, dataset_name, args)
+            ###############
 
 
 def get_parser():
     parser = argparse.ArgumentParser()
 
     # === Trajnet++ ===
+    parser.add_argument("--trajnet_evaluator", default=1, type=int)
     parser.add_argument("--log_dir", default="./")
     parser.add_argument('--write_only', action='store_true')
     parser.add_argument("--dataset_name", default="colfree_trajdata", type=str)
@@ -316,8 +285,8 @@ if __name__ == '__main__':
 
     # Load the processor - he'll handle model predictions
     args.load_model = 1
-    processor = Processor(args)
 
+    # Is this needed?
     args.checkpoint = os.path.join(
         args.save_dir, args.train_model, f"{args.train_model}_best.tar"
         )
@@ -332,7 +301,6 @@ if __name__ == '__main__':
 
     ##############################
     # TODO:
-    #   - check whether the model gets loaded properly
     #   - add zero_pad flag to trajnet loader
     ##############################
 
