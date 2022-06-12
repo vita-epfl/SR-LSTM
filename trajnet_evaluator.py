@@ -23,41 +23,45 @@ from yaml import CLoader as Loader, CDumper as Dumper
 from Processor import *
 
 
-def predict_scene(model, batch, args):
-    assert len(batch) == 7
-    batch = [tensor.cuda() for tensor in batch]
-    (
-        obs_traj,
-        pred_traj_gt,
-        obs_traj_rel,
-        pred_traj_gt_rel,
-        non_linear_ped,
-        loss_mask,
-        seq_start_end,
-    ) = batch
+def predict_scene(processor, batch_idx, args):
+    # Put the model in eval mode
+    processor.net.eval()
 
-    # If there's only one pedestrian, use the Dummy model
-    if obs_traj.shape[1] == 1:
-        model_to_use = DummyGAT(model, args)
-    else:
-        model_to_use = model
+    # Get the corresponding batch
+    batch, _ = processor.dataloader.get_test_batch(batch_idx)
+    batch = [torch.Tensor(tensor).cuda() for tensor in batch]
+    assert len(batch) == 7
+
+    batch_abs, batch_norm, shift_value, \
+    seq_list, nei_list, nei_num, batch_pednum = \
+        batch
+    inputs_fw = \
+        batch_abs[:-1], batch_norm[:-1], shift_value[:-1], \
+        seq_list[:-1], nei_list[:-1], nei_num[:-1], batch_pednum[:-1]
 
     # Get the predictions and save them
     multimodal_outputs = {}
     for num_p in range(args.modes):
-        pred_traj_fake_rel = model_to_use(
-            obs_traj_rel, obs_traj, seq_start_end, 0, 3
-            )
+
+        #############################
+        # TODO:
+        #   - when inputs_fw are passed, the output is of shape [19, ..., 2]
+        #   - check what is the output shape in STGAT
+        #   - check whether it would work if we pass inputs
+        # Conclusion:
+        #   - it should be fine just to keep the last pred_len frames
+
+        outputs_infer, _, _, _ = \
+            processor.net.forward(inputs_fw, iftest=True)
         
-        # Convert to absolute coordinates
-        pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
-        pred_traj_fake = pred_traj_fake.detach().cpu().numpy()
+        outputs_infer = outputs_infer.detach().cpu().numpy()
 
-        output_primary = pred_traj_fake[:, 0]
-        output_neighs = pred_traj_fake[:, 1:]
+        output_primary = outputs_infer[-args.pred_len:, 0]
+        output_neighs = outputs_infer[-args.pred_len:, 1:]
         multimodal_outputs[num_p] = [output_primary, output_neighs]
+        #############################
 
-    return multimodal_outputs
+    # return multimodal_outputs
 
 
 
@@ -110,15 +114,13 @@ def get_predictions(args):
             processor.create_dataloader_for_evaluator(scenes, zero_pad=True)
 
             # Get all predictions in parallel. Faster!
-            scenes_loader = tqdm(processor.dataloader.testbatch)
-            
+            pred_list = Parallel(n_jobs=args.n_jobs)(
+                delayed(predict_scene)(processor, batch_idx, args)
+                for batch_idx in tqdm(range(processor.dataloader.testbatchnums))
+                )
+
             ###############
             # TODO:
-            # pred_list = Parallel(n_jobs=args.n_jobs)(
-            #     delayed(predict_scene)(model, batch, args)
-            #     for batch in scenes_loader
-            #     )
-            
             # # Write all predictions
             # write_predictions(pred_list, scenes, model_name, dataset_name, args)
             ###############
@@ -138,7 +140,8 @@ def get_parser():
     parser.add_argument("--pred_len", default=12, type=int)
     parser.add_argument("--skip", default=1, type=int)
     parser.add_argument("--fill_missing_obs", default=0, type=int)
-    parser.add_argument("--keep_single_ped_scenes", default=0, type=int)
+    # In order to keep the collision test
+    parser.add_argument("--keep_single_ped_scenes", default=1, type=int)
     parser.add_argument("--sample", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=72, help="Random seed.")
     parser.add_argument("--batch_size", default=8, type=int)
@@ -298,13 +301,6 @@ if __name__ == '__main__':
     args.obs_length = args.obs_len
     args.pred_length = args.pred_len
 
-
-    ##############################
-    # TODO:
-    #   - add zero_pad flag to trajnet loader
-    ##############################
-
-
     # Writes to Test_pred
     # Does NOT overwrite existing predictions if they already exist ###
     get_predictions(args)
@@ -314,8 +310,4 @@ if __name__ == '__main__':
 
     ## Evaluate using TrajNet++ evaluator
     trajnet_evaluate(args)
-
-
-
-
 
