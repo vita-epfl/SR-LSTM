@@ -121,6 +121,8 @@ class Processor():
                 model_epoch = checkpoint['epoch']
                 self.net.load_state_dict(checkpoint['state_dict'])
                 print('Loaded checkpoint at epoch', model_epoch)
+            else:
+                print(f'No file found at: {self.args.model_save_path}')
 
     def load_model_epoch(self,epoch):
         raise NotImplementedError

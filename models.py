@@ -48,11 +48,14 @@ class SR_LSTM(nn.Module):
         nn.init.normal_(self.outputLayer.weight, std=self.args.std_out)
 
     def forward(self, inputs,iftest=False):
-
-        nodes_abs, nodes_norm, shift_value, seq_list, nei_list, nei_num, batch_pednum=inputs
+        
+        # nodes_abs == batch_abs [19, N, 2]
+        nodes_abs, nodes_norm, shift_value, seq_list, \
+        nei_list, nei_num, batch_pednum = \
+            inputs
         num_Ped = nodes_norm.shape[1]
         
-        outputs=torch.zeros(nodes_norm.shape[0],num_Ped, self.args.output_size)
+        outputs = torch.zeros(nodes_norm.shape[0], num_Ped, self.args.output_size)
         hidden_states = torch.zeros(num_Ped, self.args.rnn_size)
         cell_states = torch.zeros(num_Ped, self.args.rnn_size)
 
@@ -67,37 +70,50 @@ class SR_LSTM(nn.Module):
             
         # For each frame in the sequence
         for framenum in range(self.args.seq_length-1):
+
             if framenum >= self.args.obs_length and iftest:
+                # Take only the pedestrians who are present in the last observed frame
                 node_index = seq_list[self.args.obs_length - 1] > 0
                 nodes_current = outputs[framenum - 1, node_index].clone()
+                # Previous frame absolute value
+                nodes_abs = shift_value[framenum, node_index] + nodes_current
+                nodes_abs = nodes_abs.repeat(nodes_abs.shape[0], 1, 1)
 
-                nodes_abs=shift_value[framenum,node_index]+nodes_current
-
-                nodes_abs=nodes_abs.repeat(nodes_abs.shape[0], 1, 1)
-                corr_index=nodes_abs.transpose(0,1)-nodes_abs
+                corr_index = nodes_abs.transpose(0,1) - nodes_abs
             else:
                 node_index=seq_list[framenum]>0
-                nodes_current = nodes_norm[framenum,node_index]
+                nodes_current = nodes_norm[framenum, node_index]
                 corr = nodes_abs[framenum, node_index].repeat(nodes_current.shape[0], 1, 1)
                 nei_index = nei_list[framenum, node_index]
                 nei_index = nei_index[:, node_index]
+
                 # relative coords
-                corr_index = corr.transpose(0,1)-corr
-                nei_num_index=nei_num[framenum,node_index]
+                corr_index = corr.transpose(0, 1) - corr
+                nei_num_index = nei_num[framenum, node_index]
 
             hidden_states_current=hidden_states[node_index]
             cell_states_current=cell_states[node_index]
 
-            input_embedded = self.dropout(self.input_Ac(self.inputLayer(nodes_current)))
+            input_embedded = self.dropout(
+                self.input_Ac(self.inputLayer(nodes_current))
+                )
 
-            lstm_state = self.cell.forward(input_embedded, (hidden_states_current,cell_states_current))
+            lstm_state = self.cell.forward(
+                input_embedded, (hidden_states_current,cell_states_current)
+                )
 
             for p in range(self.args.passing_time ):
                 if p==0:
-                    lstm_state, look = self.gcn.forward(corr_index, nei_index, nei_num_index, lstm_state,self.gcn.W_nei)
+                    lstm_state, look = self.gcn.forward(
+                        corr_index, nei_index, nei_num_index, 
+                        lstm_state,self.gcn.W_nei
+                        )
                     value1, value2, value3 = look
                 if p==1:
-                    lstm_state, look = self.gcn1.forward(corr_index, nei_index, nei_num_index, lstm_state,self.gcn1.W_nei)
+                    lstm_state, look = self.gcn1.forward(
+                        corr_index, nei_index, nei_num_index, 
+                        lstm_state,self.gcn1.W_nei
+                        )
 
 
             _, hidden_states_current, cell_states_current = lstm_state
@@ -107,8 +123,8 @@ class SR_LSTM(nn.Module):
             value3_sum+=value3
 
             outputs_current = self.outputLayer(hidden_states_current)
-            outputs[framenum,node_index]=outputs_current
-            hidden_states[node_index]=hidden_states_current
+            outputs[framenum, node_index] = outputs_current
+            hidden_states[node_index] = hidden_states_current
             cell_states[node_index] = cell_states_current
 
         return outputs, hidden_states, cell_states, \

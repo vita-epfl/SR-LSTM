@@ -134,7 +134,8 @@ def trajnet_loader(
     drop_distant_ped=False, 
     test=False, 
     keep_single_ped_scenes=False,
-    fill_missing_obs=False
+    fill_missing_obs=False,
+    zero_pad_pos_scene=False,
     ):
     """
     The SR-LSTM expects the return values to have the following format:
@@ -151,7 +152,7 @@ def trajnet_loader(
             [batch_size]
     """
     # Specific for SR-LSTM
-    num_frames = args.obs_len + args.pred_len
+    num_frames = args.seq_length
     pos_scenes, peds_are_present, adj_matrices, seq_start_end = [], [], [], []
 
     num_batches = 0
@@ -172,6 +173,12 @@ def trajnet_loader(
             full_traj = np.isfinite(pos_scene).all(axis=2).all(axis=0)
             pos_scene = pos_scene[:, full_traj]
         
+        if zero_pad_pos_scene:
+            pos_scene_original = pos_scene.copy()
+            num_frames_original = pos_scene_original.shape[0]
+            pos_scene = np.zeros((num_frames, pos_scene_original.shape[1], 2))
+            pos_scene[:num_frames_original, :, :] = pos_scene_original
+
         # === From now on it's specific for SR-LSTM ===
         if sum(full_traj) > 1 or keep_single_ped_scenes:
             pos_scene_obs_pred = pos_scene[:args.obs_len + args.pred_len]

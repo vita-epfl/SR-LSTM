@@ -150,14 +150,20 @@ def L2forTest_nl(outputs,targets,obs_length,lossMask,seq_list,nl_thred):
     error_nl =error*nl_list
     #only calculate the pedestrian presents fully presented in the time window
     pedi_full=torch.sum(lossMask,dim=0)==seq_length
-    error_nl = error_nl[obs_length - 1:,pedi_full]
-    error_full=error[obs_length-1:,pedi_full]
-    error_sum=torch.sum(error_full)
+    
+    error_nl = error_nl[obs_length - 1:, pedi_full]
+    error_full = error[obs_length - 1:, pedi_full]
+    
+    error_sum = torch.sum(error_full)
     error_cnt=error_full.numel()
-    final_error=torch.sum(error_full[-1])
-    final_error_cnt=error_full[-1].numel()
+    
+    final_error = torch.sum(error_full[-1])
+    final_error_cnt = error_full[-1].numel()
+    
     error_nl=error_nl[error_nl>0]
-    return error_sum.item(),error_cnt,final_error.item(),final_error_cnt,torch.sum(error_nl).item(),error_nl.numel(),error_full
+    
+    return error_sum.item(), error_cnt, final_error.item(), final_error_cnt, \
+        torch.sum(error_nl).item(), error_nl.numel(), error_full
 
 def import_class(name):
     components = name.split('.')
