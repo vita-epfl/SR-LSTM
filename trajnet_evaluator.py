@@ -43,25 +43,26 @@ def predict_scene(processor, batch_idx, args):
     multimodal_outputs = {}
     for num_p in range(args.modes):
 
-        #############################
-        # TODO:
-        #   - when inputs_fw are passed, the output is of shape [19, ..., 2]
-        #   - check what is the output shape in STGAT
-        #   - check whether it would work if we pass inputs
-        # Conclusion:
-        #   - it should be fine just to keep the last pred_len frames
-
+        # First seq_len - 1 frames are forwarded to the model
+        # and it predicts the last seq_len - 1
+        # i.e. we pass batch[:-1] and the target is batch[1:]
         outputs_infer, _, _, _ = \
             processor.net.forward(inputs_fw, iftest=True)
         
+        # Relative to absolute !!!
+        outputs_infer += shift_value[1:]
+
+        # Detach + numpy
         outputs_infer = outputs_infer.detach().cpu().numpy()
 
         output_primary = outputs_infer[-args.pred_len:, 0]
         output_neighs = outputs_infer[-args.pred_len:, 1:]
-        multimodal_outputs[num_p] = [output_primary, output_neighs]
-        #############################
+        if output_neighs.shape[1] == 0:
+            output_neighs = []
 
-    # return multimodal_outputs
+        multimodal_outputs[num_p] = [output_primary, output_neighs]
+
+    return multimodal_outputs
 
 
 
@@ -113,17 +114,25 @@ def get_predictions(args):
             # Convert it to a trajnet loader
             processor.create_dataloader_for_evaluator(scenes, zero_pad=True)
 
-            # Get all predictions in parallel. Faster!
-            pred_list = Parallel(n_jobs=args.n_jobs)(
-                delayed(predict_scene)(processor, batch_idx, args)
-                for batch_idx in tqdm(range(processor.dataloader.testbatchnums))
-                )
-
-            ###############
+            ######################
             # TODO:
-            # # Write all predictions
-            # write_predictions(pred_list, scenes, model_name, dataset_name, args)
-            ###############
+            #   - Switch this back to parallel computation when finished
+            #   (for now keep it this way; there's a problem for some reason)
+            pred_list = [
+                predict_scene(processor, batch_idx, args) \
+                for batch_idx in tqdm(range(processor.dataloader.testbatchnums))
+                ]
+
+            # # Get all predictions in parallel. Faster!
+            # pred_list = Parallel(n_jobs=args.n_jobs)(
+            #     delayed(predict_scene)(processor, batch_idx, args)
+            #     for batch_idx in tqdm(range(processor.dataloader.testbatchnums))
+            #     )
+
+            ######################
+
+            # Write all predictions
+            write_predictions(pred_list, scenes, model_name, dataset_name, args)
 
 
 def get_parser():
@@ -136,15 +145,16 @@ def get_parser():
     parser.add_argument("--dataset_name", default="colfree_trajdata", type=str)
     parser.add_argument("--delim", default="\t")
     parser.add_argument("--loader_num_workers", default=4, type=int)
-    parser.add_argument("--obs_len", default=8, type=int)
+
+    parser.add_argument("--obs_len", default=9, type=int)
     parser.add_argument("--pred_len", default=12, type=int)
-    parser.add_argument("--skip", default=1, type=int)
-    parser.add_argument("--fill_missing_obs", default=0, type=int)
-    # In order to keep the collision test
+    parser.add_argument("--fill_missing_obs", default=1, type=int)
     parser.add_argument("--keep_single_ped_scenes", default=1, type=int)
+
+    parser.add_argument("--skip", default=1, type=int)
     parser.add_argument("--sample", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=72, help="Random seed.")
-    parser.add_argument("--batch_size", default=8, type=int)
+    parser.add_argument("--batch_size", default=1, type=int)
     parser.add_argument('--disable-collision', action='store_true')
     parser.add_argument('--labels', required=False, nargs='+')
     parser.add_argument('--normalize_scene', action='store_true')

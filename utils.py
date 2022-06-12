@@ -28,7 +28,10 @@ class DataLoader_bytrajec2():
             # Trajnet evaluator case
             self.testbatch, self.testbatchnums = \
                 self.load_trajnet_loader(
-                    self.args, loader=prepared_data, zero_pad=zero_pad
+                    self.args, mode='test', 
+                    loader=prepared_data, 
+                    zero_pad=zero_pad,
+                    drop_distant_ped=False
                     )
             print('Total number of test batches:', self.testbatchnums)
         else:
@@ -48,7 +51,13 @@ class DataLoader_bytrajec2():
             # =======================================
 
 
-    def load_trajnet_loader(self, args, mode='train', loader=None, zero_pad=False):
+    def load_trajnet_loader(
+        self, args, 
+        mode='train', 
+        loader=None, 
+        zero_pad=False,
+        drop_distant_ped=True
+        ):
         """
         The loader has to be of the same format as the "batch_data" lists in the 
         functions that act as batch getters (get_train_batch, ...).
@@ -58,15 +67,16 @@ class DataLoader_bytrajec2():
         if loader is None:
             # Construct the dataset
             loader, _, _ = prepare_data(
-                'datasets/' + args.dataset_name, subset=f'/{mode}/', sample=args.sample
+                'datasets/' + args.dataset_name, 
+                subset=f'/{mode}/', sample=args.sample
                 )
         # Convert datasets to trajnet loaders
         traj_loader = trajnet_loader(
             loader, args, 
-            drop_distant_ped=True, 
+            drop_distant_ped=drop_distant_ped, 
             fill_missing_obs=args.fill_missing_obs,
             keep_single_ped_scenes=args.keep_single_ped_scenes,
-            test=(mode == 'test'),
+            test=(mode == 'test' or mode == 'test_private'),
             zero_pad_pos_scene=zero_pad
             ) 
         traj_loader = list(traj_loader)
