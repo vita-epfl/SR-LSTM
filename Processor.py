@@ -162,7 +162,7 @@ class Processor():
     def playtrain(self):
         print('Training begin')
         find_result=[]
-        test_error, test_final_error, best_test_error = 0, 0, 0
+        test_error, test_final_error, best_test_error = 0, 0, np.inf
         for epoch in range(self.args.num_epochs):
             
             # Train and validation epochs
