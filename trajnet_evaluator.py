@@ -45,7 +45,7 @@ def predict_scene(processor, batch_idx, args):
 
         # First seq_len - 1 frames are forwarded to the model
         # and it predicts the last seq_len - 1
-        # i.e. we pass batch[:-1] and the target is batch[1:]
+        # i.e. we pass batch[:-1] and the target is batch_norm[1:]
         outputs_infer, _, _, _ = \
             processor.net.forward(inputs_fw, iftest=True)
         
@@ -248,52 +248,24 @@ def get_parser():
 
     return parser
 
-def load_arg(p):
-    # save arg
-    if  os.path.exists(p.config):
-        with open(p.config, 'r') as f:
-            default_arg = yaml.load(f, Loader=Loader)
-        key = vars(p).keys()
-        for k in default_arg.keys():
-            if k not in key:
-                print('WRONG ARG: {}'.format(k))
-                try:
-                    assert (k in key)
-                except:
-                    s=1
-        parser.set_defaults(**default_arg)
-        return parser.parse_args()
-    else:
-        return False
-
-def save_arg(args):
-    # save arg
-    arg_dict = vars(args)
-    if not os.path.exists(args.model_dir):
-        os.makedirs(args.model_dir)
-    with open(args.config, 'w') as f:
-        yaml.dump(arg_dict, f)
 
 
 if __name__ == '__main__':
     parser = get_parser()
-    p = parser.parse_args()
+    args = parser.parse_args()
 
     # === Trajnet++ ===
     # Overwriting overlapping arguments with different names
-    p.obs_length = p.obs_len
-    p.pred_length = p.pred_len
-    p.seq_length = p.obs_len + p.pred_len
-    p.dataset = p.dataset_name
+    args.obs_length = args.obs_len
+    args.pred_length = args.pred_len
+    args.seq_length = args.obs_len + args.pred_len
+    args.dataset = args.dataset_name
     # =================
 
-    p.save_dir = p.save_base_dir + str(p.test_set) + '/'
-    p.model_dir = p.save_base_dir + str(p.test_set) + '/' + p.train_model + '/'
-    p.config= p.model_dir + '/config_' + p.phase + '.yaml'
+    args.save_dir = args.save_base_dir + str(args.test_set) + '/'
+    args.model_dir = args.save_base_dir + str(args.test_set) + '/' + args.train_model + '/'
+    args.config= args.model_dir + '/config_' + args.phase + '.yaml'
 
-    if not load_arg(p):
-        save_arg(p)
-    args = load_arg(p)
     torch.cuda.set_device(args.gpu)
 
     # Load the processor - he'll handle model predictions
