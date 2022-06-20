@@ -115,9 +115,11 @@ def get_predictions(args):
             processor.create_dataloader_for_evaluator(scenes, zero_pad=True)
 
             ######################
-            # TODO:
-            #   - Switch this back to parallel computation when finished
-            #   (for now keep it this way; there's a problem for some reason)
+            # NOTE:
+            #   Switch this back to parallel computation if possible
+            #   (on our machine there's a problem for some reason)
+
+            # Get all predictions
             pred_list = [
                 predict_scene(processor, batch_idx, args) \
                 for batch_idx in tqdm(range(processor.dataloader.testbatchnums))
@@ -128,7 +130,7 @@ def get_predictions(args):
             #     delayed(predict_scene)(processor, batch_idx, args)
             #     for batch_idx in tqdm(range(processor.dataloader.testbatchnums))
             #     )
-
+            
             ######################
 
             # Write all predictions
